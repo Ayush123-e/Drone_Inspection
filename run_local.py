@@ -3,22 +3,16 @@ import os
 import json
 from unittest.mock import MagicMock, patch
 
-# Ensure src is importable
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
-# Set mock environment variables
 os.environ["DYNAMODB_TABLE"] = "mock-drone-inspection-table"
 os.environ["S3_IMAGES_BUCKET"] = "mock-drone-inspection-images"
 
-# In-memory database simulation store
 mock_db = []
-
-# --- Mocking Setup ---
 
 class MockTable:
     def put_item(self, Item):
-        print(f"  [DDB Mock] put_item called: PK={Item.get('PK')}, SK={Item.get('SK')}")
-        # Check if already exists, overwrite if yes
+        print(f"  [DDB Mock] put_item: PK={Item.get('PK')}, SK={Item.get('SK')}")
         for idx, existing in enumerate(mock_db):
             if existing.get("PK") == Item.get("PK") and existing.get("SK") == Item.get("SK"):
                 mock_db[idx] = Item
@@ -28,24 +22,14 @@ class MockTable:
 
     def query(self, **kwargs):
         limit = kwargs.get("Limit", 20)
-        # Parse expression values
         expr_vals = kwargs.get("ExpressionAttributeValues", {})
-        
-        # Simple query parser based on typical lookups
         results = []
         
-        # Check GSI1 query
         if kwargs.get("IndexName") == "GSI1":
-            # Extract partition key match
             pk_val = expr_vals.get(":pk")
             sk_prefix = expr_vals.get(":sk_prefix")
             
-            # If KeyConditionExpression is a boto3 Key object, we inspect its attributes
-            # Let's fallback to manually checking variables in GSI1 query shape
             if not pk_val:
-                # Key object string representation analysis helper
-                key_expr_str = str(kwargs.get("KeyConditionExpression"))
-                # Extract WAREHOUSE# or DRONE# from expression
                 for item in mock_db:
                     if "GSI1-PK" in item and item["GSI1-PK"].startswith("WAREHOUSE#"):
                         results.append(item)
@@ -56,17 +40,11 @@ class MockTable:
                             continue
                         results.append(item)
         else:
-            # Base table query
             pk_val = expr_vals.get(":pk")
             sk_prefix = expr_vals.get(":sk_prefix")
             
             if not pk_val:
-                # Inspect Key object
-                key_expr_str = str(kwargs.get("KeyConditionExpression"))
-                # Filter images by inspection id or drone link items
                 for item in mock_db:
-                    # Match images (PK: INSPECTION#..., SK: IMAGE#...)
-                    # or drone links (PK: DRONE#..., SK: INSPECTION#...)
                     if "INSPECTION#" in item.get("PK", "") or "DRONE#" in item.get("PK", ""):
                         results.append(item)
             else:
@@ -76,9 +54,7 @@ class MockTable:
                             continue
                         results.append(item)
         
-        # Sort results: descending order if ScanIndexForward is False
         scan_forward = kwargs.get("ScanIndexForward", True)
-        # Sort based on SK (lexicographically, which works for ISO timestamps)
         results.sort(key=lambda x: x.get("SK", "") or x.get("GSI1-SK", ""), reverse=not scan_forward)
         
         sliced_results = results[:limit]
@@ -94,16 +70,14 @@ class MockTable:
 
 class MockDynamoDBClient:
     def transact_write_items(self, TransactItems):
-        print(f"  [DDB Mock] transact_write_items called with {len(TransactItems)} operations.")
+        print(f"  [DDB Mock] transact_write_items operations count: {len(TransactItems)}")
         for op in TransactItems:
             if "Put" in op:
                 raw_item = op["Put"]["Item"]
-                # Convert low-level client format to high-level resource format
                 item = {}
                 for k, v in raw_item.items():
                     item[k] = list(v.values())[0]
                 
-                # Overwrite or append
                 exists = False
                 for idx, existing in enumerate(mock_db):
                     if existing.get("PK") == item.get("PK") and existing.get("SK") == item.get("SK"):
@@ -122,26 +96,21 @@ class MockS3Client:
         print(f"  [S3 Mock] generate_presigned_url: {url}")
         return url
 
-# --- Run Tests ---
-
 def run_local_simulation():
     print("=" * 60)
     print("  VECROS DRONE BACKEND - LOCAL SIMULATION RUNNER")
     print("=" * 60)
 
-    # Initialize mock patches
     mock_table = MockTable()
     mock_client = MockDynamoDBClient()
     mock_s3 = MockS3Client()
 
-    # Apply patches
     patcher_resource = patch("boto3.resource")
     patcher_client = patch("boto3.client")
     
     mock_boto3_resource = patcher_resource.start()
     mock_boto3_client = patcher_client.start()
     
-    # Configure mock returns
     mock_dynamodb_resource = MagicMock()
     mock_dynamodb_resource.Table.return_value = mock_table
     mock_dynamodb_resource.meta.client = mock_client
@@ -162,11 +131,9 @@ def run_local_simulation():
     mock_boto3_client.side_effect = side_effect_client
 
     try:
-        # Import handlers inside the mock context
         from src import inspections
         from src import images
 
-        # Re-initialize local handlers module references
         inspections.table = mock_table
         inspections.dynamodb_client = mock_client
         images.table = mock_table
@@ -187,7 +154,6 @@ def run_local_simulation():
         print(f"Response: {res['statusCode']}")
         print(json.dumps(json.loads(res["body"]), indent=4))
         
-        # Save inspection_id for subsequent tests
         inspection_id = json.loads(res["body"])["inspection_id"]
 
         print("\n[STEP 2] Listing Inspections by Warehouse...")

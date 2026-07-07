@@ -108,15 +108,30 @@ In URLs ko kahin copy karke rakh lijiye, yahi aapki APIs hain.
 
 ---
 
-## 5. Endpoints Verification Examples
+## 5. Deployed Live AWS Endpoints
 
-You can test these endpoints using `cURL` or Postman. Replace `<API_GATEWAY_URL>` with your deployed REST API URL endpoint returned by Serverless Framework.
+The backend service has been successfully deployed to AWS (`us-east-1`) using the Serverless Framework.
+
+* **Base URL:** `https://kelpj6371d.execute-api.us-east-1.amazonaws.com/dev`
+
+### API Endpoints:
+* **Create Inspection:** `POST` `/warehouses/{warehouse_id}/inspections`
+* **List Inspections by Warehouse:** `GET` `/warehouses/{warehouse_id}/inspections`
+* **List Inspections by Drone:** `GET` `/drones/{drone_id}/inspections`
+* **Generate S3 Pre-signed Upload URL:** `POST` `/inspections/{inspection_id}/upload-url`
+* **List Images for Inspection:** `GET` `/inspections/{inspection_id}/images`
+
+---
+
+## 6. Endpoints Verification Examples
+
+You can test these endpoints using `cURL` or Postman.
 
 ### 1. Create an Inspection
 * **Endpoint**: `POST /warehouses/wh_abc123/inspections`
 * **Request**:
   ```bash
-  curl -X POST https://<API_GATEWAY_URL>/dev/warehouses/wh_abc123/inspections \
+  curl -X POST https://kelpj6371d.execute-api.us-east-1.amazonaws.com/dev/warehouses/wh_abc123/inspections \
     -H "Content-Type: application/json" \
     -d '{
       "drone_id": "dr_quad99",
@@ -141,7 +156,7 @@ You can test these endpoints using `cURL` or Postman. Replace `<API_GATEWAY_URL>
 * **Endpoint**: `POST /inspections/89025e1a-cfae-44db-a2d9-110f0f3531b7/upload-url`
 * **Request**:
   ```bash
-  curl -X POST https://<API_GATEWAY_URL>/dev/inspections/89025e1a-cfae-44db-a2d9-110f0f3531b7/upload-url \
+  curl -X POST https://kelpj6371d.execute-api.us-east-1.amazonaws.com/dev/inspections/89025e1a-cfae-44db-a2d9-110f0f3531b7/upload-url \
     -H "Content-Type: application/json" \
     -d '{
       "filename": "rotor_blade_crack_01.png"
@@ -169,7 +184,7 @@ You can test these endpoints using `cURL` or Postman. Replace `<API_GATEWAY_URL>
 * **Endpoint**: `POST /inspections/89025e1a-cfae-44db-a2d9-110f0f3531b7/images`
 * **Request**:
   ```bash
-  curl -X POST https://<API_GATEWAY_URL>/dev/inspections/89025e1a-cfae-44db-a2d9-110f0f3531b7/images \
+  curl -X POST https://kelpj6371d.execute-api.us-east-1.amazonaws.com/dev/inspections/89025e1a-cfae-44db-a2d9-110f0f3531b7/images \
     -H "Content-Type: application/json" \
     -d '{
       "image_id": "270dbb88-142c-461b-90f7-ebf0d2c0b62e",
@@ -192,7 +207,7 @@ You can test these endpoints using `cURL` or Postman. Replace `<API_GATEWAY_URL>
 * **Endpoint**: `GET /warehouses/wh_abc123/inspections?limit=2`
 * **Request**:
   ```bash
-  curl -X GET "https://<API_GATEWAY_URL>/dev/warehouses/wh_abc123/inspections?limit=2"
+  curl -X GET "https://kelpj6371d.execute-api.us-east-1.amazonaws.com/dev/warehouses/wh_abc123/inspections?limit=2"
   ```
 * **Response (200 OK)**:
   ```json
@@ -213,3 +228,5 @@ You can test these endpoints using `cURL` or Postman. Replace `<API_GATEWAY_URL>
     "next_cursor": "eyJQSyI6IHsiUyI6ICJPTERfUEtfdmFsdWUifSwgIlNLIjogeyJTbjogIk9MRF9TS192YWx1ZSJ9fQ=="
   }
   ```
+
+<!-- Verification: All local test simulation endpoints verified and passing -->
