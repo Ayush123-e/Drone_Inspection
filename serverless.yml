@@ -1,0 +1,179 @@
+service: drone-inspection-backend
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.9
+  stage: ${opt:stage, 'dev'}
+  region: ${opt:region, 'us-east-1'}
+  memorySize: 128
+  timeout: 10
+  logRetentionInDays: 14
+
+  # Inject Table and Bucket Names dynamically into all functions
+  environment:
+    DYNAMODB_TABLE: !Ref DroneInspectionTable
+    S3_IMAGES_BUCKET: !Ref DroneInspectionImagesBucket
+
+  # Granular IAM Roles (Principle of Least Privilege)
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:Query
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+          Resource:
+            - !GetAtt DroneInspectionTable.Arn
+            - !Join [ '/', [ !GetAtt DroneInspectionTable.Arn, 'index', 'GSI1' ] ]
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:GetObject
+          Resource:
+            - !Join [ '', [ 'arn:aws:s3:::', !Ref DroneInspectionImagesBucket, '/*' ] ]
+
+functions:
+  # 1. Create an inspection for a warehouse & drone
+  createInspection:
+    handler: src/inspections.create_inspection
+    events:
+      - http:
+          path: /warehouses/{warehouse_id}/inspections
+          method: post
+          cors: true
+          request:
+            parameters:
+              paths:
+                warehouse_id: true
+
+  # 2. List inspections by warehouse (sorted by latest timestamp)
+  listInspectionsByWarehouse:
+    handler: src/inspections.list_inspections_by_warehouse
+    events:
+      - http:
+          path: /warehouses/{warehouse_id}/inspections
+          method: get
+          cors: true
+          request:
+            parameters:
+              paths:
+                warehouse_id: true
+              querystrings:
+                cursor: false
+                limit: false
+
+  # 3. List inspections by drone (sorted by latest timestamp)
+  listInspectionsByDrone:
+    handler: src/inspections.list_inspections_by_drone
+    events:
+      - http:
+          path: /drones/{drone_id}/inspections
+          method: get
+          cors: true
+          request:
+            parameters:
+              paths:
+                drone_id: true
+              querystrings:
+                cursor: false
+                limit: false
+
+  # 4. Save image metadata under an inspection and track upload status
+  saveImageMetadata:
+    handler: src/images.save_metadata
+    events:
+      - http:
+          path: /inspections/{inspection_id}/images
+          method: post
+          cors: true
+          request:
+            parameters:
+              paths:
+                inspection_id: true
+
+  # 5. Generate S3 pre-signed upload URL and create metadata record
+  generateUploadUrl:
+    handler: src/images.generate_upload_url
+    events:
+      - http:
+          path: /inspections/{inspection_id}/upload-url
+          method: post
+          cors: true
+          request:
+            parameters:
+              paths:
+                inspection_id: true
+
+  # 6. List all images for a specific inspection
+  listImages:
+    handler: src/images.list_images_for_inspection
+    events:
+      - http:
+          path: /inspections/{inspection_id}/images
+          method: get
+          cors: true
+          request:
+            parameters:
+              paths:
+                inspection_id: true
+
+resources:
+  Resources:
+    # DynamoDB Single-Table
+    DroneInspectionTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: drone-inspection-table-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
+            AttributeType: S
+          - AttributeName: GSI1-PK
+            AttributeType: S
+          - AttributeName: GSI1-SK
+            AttributeType: S
+        KeySchema:
+          - AttributeName: PK
+            KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: GSI1
+            KeySchema:
+              - AttributeName: GSI1-PK
+                KeyType: HASH
+              - AttributeName: GSI1-SK
+                KeyType: RANGE
+            Projection:
+              ProjectionType: ALL
+
+    # S3 Bucket with strict CORS configuration for pre-signed URL uploads
+    DroneInspectionImagesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: drone-inspection-images-${self:provider.stage}-${aws:accountId}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: true
+          BlockPublicPolicy: true
+          IgnorePublicAcls: true
+          RestrictPublicBuckets: true
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - '*'
+              AllowedMethods:
+                - PUT
+                - GET
+              # AllowedOrigins should be restricted in production to your app domain (e.g., https://app.vecros.com)
+              # Using '*' here is suitable for local/testing stages, but should be narrowed down.
+              AllowedOrigins:
+                - '*'
+              ExposedHeaders:
+                - ETag
+              MaxAge: 3000
