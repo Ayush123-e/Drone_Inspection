@@ -1,0 +1,74 @@
+# ==========================================
+# Serverless Framework Artifacts
+# ==========================================
+.serverless/
+.serverless_plugins/
+.webpack/
+.dynamodb/
+
+# ==========================================
+# Python Artifacts & Environments
+# ==========================================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ==========================================
+# Security & Credentials (Do NOT upload to Git)
+# ==========================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+aws_credentials
+credentials.json
+secrets.yml
+secrets.json
+
+# ==========================================
+# macOS System Files
+# ==========================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# ==========================================
+# Editor / IDE Configs
+# ==========================================
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
